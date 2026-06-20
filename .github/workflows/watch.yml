@@ -2,19 +2,9 @@ name: Watch Gashapon Page
 
 on:
   workflow_dispatch:
-    inputs:
-      wait_first:
-        description: "Wait 10 minutes before checking"
-        type: boolean
-        default: false
-      continuous:
-        description: "Queue the next check after this run"
-        type: boolean
-        default: true
-
-permissions:
-  actions: write
-  contents: read
+  schedule:
+    # GitHub cronはUTC。10分おき（毎時2,12,22,32,42,52分 = JSTだと毎時2,12,22,32,42,52分+9h）
+    - cron: "2,12,22,32,42,52 * * * *"
 
 concurrency:
   group: gashapon-watch
@@ -23,7 +13,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     env:
       TARGET_URL: https://gashapon.jp/shop/gplus_list.php?product_code=4582769911538
@@ -31,10 +21,6 @@ jobs:
       NTFY_SERVER: https://ntfy.sh
 
     steps:
-      - name: Wait between checks
-        if: inputs.wait_first == true
-        run: sleep 600
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -49,6 +35,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm install
@@ -66,9 +60,3 @@ jobs:
         with:
           path: state
           key: gashapon-watch-snapshot
-
-      - name: Queue next check
-        if: success() && inputs.continuous == true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run watch.yml --repo "${{ github.repository }}" --ref main -f wait_first=true -f continuous=true
