@@ -7,9 +7,6 @@ on:
     # これは日本時間でも毎時11分/41分に実行。
     - cron: "3,13,23,33,43,53 * * * *"
 
-permissions:
-  contents: write
-
 concurrency:
   group: gashapon-watch
   cancel-in-progress: true
@@ -27,9 +24,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Restore snapshot
+        uses: actions/cache/restore@v4
         with:
-          ref: main
-          fetch-depth: 0
+          path: state
+          key: gashapon-watch-snapshot
+          restore-keys: gashapon-watch-snapshot
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,30 +44,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run watcher
+        id: watcher
         run: npm run check
 
-      - name: Commit snapshot if changed
-        run: |
-          if [[ -z "$(git status --porcelain state/snapshot.json)" ]]; then
-            echo "No snapshot changes."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add state/snapshot.json
-          git commit -m "Update gashapon snapshot"
-
-          for attempt in 1 2 3 4 5; do
-            git fetch origin main
-            git rebase origin/main
-            if git push origin HEAD:main; then
-              echo "Snapshot pushed successfully."
-              exit 0
-            fi
-            echo "Push failed (attempt ${attempt}/5), retrying..."
-            sleep $((attempt * 3))
-          done
-
-          echo "Failed to push snapshot after retries."
-          exit 1
+      - name: Save snapshot
+        if: success() && hashFiles('state/snapshot.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: gashapon-watch-snapshot
