@@ -5,7 +5,7 @@ on:
   schedule:
     # GitHub ActionsのcronはUTC基準。
     # これは日本時間でも毎時11分/41分に実行。
-    - cron: "11,41 * * * *"
+    - cron: "3,13,23,33,43,53 * * * *"
 
 permissions:
   contents: write
