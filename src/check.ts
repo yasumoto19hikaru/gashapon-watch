@@ -97,19 +97,25 @@ function limitMessage(message: string): string {
   );
 }
 
-async function notifyNtfy(message: string): Promise<void> {
+async function notifyNtfy(
+  message: string,
+  title = "ガシャポン更新検知"
+): Promise<void> {
   if (!NTFY_TOPIC) {
     console.log("NTFY_TOPIC is not set. Skip notification.");
     return;
   }
 
   const server = NTFY_SERVER.replace(/\/$/, "");
-  const res = await fetch(`${server}/${encodeURIComponent(NTFY_TOPIC)}`, {
+  const url = new URL(`${server}/${encodeURIComponent(NTFY_TOPIC)}`);
+  url.searchParams.set("title", title);
+  url.searchParams.set("priority", "high");
+  url.searchParams.set("tags", "bell");
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
-      Title: "ガシャポン更新検知",
-      Priority: "high",
-      Tags: "bell"
+      "Content-Type": "text/plain; charset=utf-8"
     },
     body: limitMessage(message)
   });
@@ -205,7 +211,7 @@ main().catch(async (error) => {
   console.error(message);
 
   try {
-    await notifyNtfy(message);
+    await notifyNtfy(message, "ガシャポン監視エラー");
   } catch (notifyError) {
     console.error("Failed to notify error:", notifyError);
   }
